@@ -1,0 +1,30 @@
+Install:
+    untar / unzip archive
+    change directory to unpacked files
+    Prepare with:
+        ./configure
+    Build src
+        make
+    Install
+        sudo make install
+
+    For detailed configure options, see INSTALL file
+
+Usage:
+    jsonparser is intended as supplementary code for your own projects.
+    main.c provides examples of usage, but is no usable program.
+
+
+    struct json* readJSON(const char* string, char* error);
+
+    Parses JSON String (UTF8/ANSI Encoded) to json structure.
+    If input string is not valid, readJSON returns NULL. char* error will contain a hint why json parsing failed.
+
+    After parsing a JSON to struct json* the resulting structure is mutable, so you can add or remove parts of structure.
+    To archive this, jsonhelper.h provides several functions.
+
+
+    char* writeJSON(struct json* node);
+
+    Take a given Structure an write a UTF-8 encoded, ANSI-Transport-Safe JSON String.
+
