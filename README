@@ -26,5 +26,5 @@ Usage:
 
     char* writeJSON(struct json* node);
 
-    Take a given Structure an write a UTF-8 encoded, ANSI-Transport-Safe JSON String.
+    Translates struct json* to UTF-8 encoded, ANSI-Transport-Safe JSON String.
 
