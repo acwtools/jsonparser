@@ -37,7 +37,7 @@ struct json* _jsonGetByKey( struct json* object, const char* key, size_t* index 
     child = object->children;
     while( *child != NULL  )
     {
-        if( (*child)->value.s[0] == key[0] )
+        if( (*child)->type == JSON_TYPE_KEY && (*child)->value.s[0] == key[0] )
         {
             if( strcmp( (*child)->value.s, key ) == 0 )
             {
@@ -52,10 +52,17 @@ struct json* _jsonGetByKey( struct json* object, const char* key, size_t* index 
 }
 
 
-struct json* jsonGetByKey( struct json* object, const char* key )
+struct json* jsonGetByKey( struct json* object, const char* key, char* error )
 {
     size_t index = 0;
-    struct json* child = _jsonGetByKey(object, key, &index);
+    struct json* child = NULL;
+
+    if( object == NULL || object->type != JSON_TYPE_OBJECT )
+    {
+        *error = JSON_ERROR_INVALIDTYPE;
+        return 0;
+    }
+    child = _jsonGetByKey(object, key, &index);
     if( child != NULL && child->children != NULL && child->children[0] != NULL )
     {
         return child->children[0];
@@ -65,10 +72,17 @@ struct json* jsonGetByKey( struct json* object, const char* key )
 }
 
 
-char jsonRemoveByKey( struct json* object, const char* key )
+char jsonRemoveByKey( struct json* object, const char* key, char* error )
 {
     size_t index = 0;
-    struct json* child = _jsonGetByKey(object, key, &index);
+    struct json* child = NULL;
+    if( object == NULL || object->type != JSON_TYPE_OBJECT )
+    {
+        *error = JSON_ERROR_INVALIDTYPE;
+        return 0;
+    }
+
+    child = _jsonGetByKey(object, key, &index);
     if( child != NULL )
     {
         object->children = jsonRemoveItem(object->children, index, 1);
@@ -79,23 +93,24 @@ char jsonRemoveByKey( struct json* object, const char* key )
 }
 
 
-char jsonAddPair(struct json* object, const char* key, struct json* value)
+char jsonAddPair(struct json* object, const char* key, struct json* value, char* error)
 {
     struct json* child = NULL;
     if( object == NULL || object->type != JSON_TYPE_OBJECT )
     {
+        *error = JSON_ERROR_INVALIDTYPE;
         return 0;
     }
 
     child = newJSON(JSON_TYPE_KEY);
     child->value.s = copyValue(key);
-    child->children = jsonPushNode(child->children, value);
-    object->children = jsonPushNode(object->children, child);
+    child->children = jsonPushNode(child->children, value, error);
+    object->children = jsonPushNode(object->children, child, error);
 
     return 1;
 }
 
-struct json** jsonPushNode(struct json** list, struct json* newnode)
+struct json** jsonPushNode(struct json** list, struct json* newnode, char* error)
 {
     size_t size = 0;
     struct json** newlist = NULL;
@@ -111,8 +126,8 @@ struct json** jsonPushNode(struct json** list, struct json* newnode)
 
         if(list == NULL)
         {
-            /* memoryFailure(); */
-            exit(EXIT_FAILURE);
+            *error = JSON_ERROR_OUTOFMEMORY;
+            return NULL;
         }
 
         list[0] = newnode;
@@ -124,8 +139,8 @@ struct json** jsonPushNode(struct json** list, struct json* newnode)
     newlist = realloc(list, (sizeof(struct json*)*(size+2)));
     if(newlist == NULL)
     {
-        /* memoryFailure(); */
-        exit(EXIT_FAILURE);
+        *error = JSON_ERROR_OUTOFMEMORY;
+        return NULL;
     }
 
     list = newlist;
@@ -136,7 +151,7 @@ struct json** jsonPushNode(struct json** list, struct json* newnode)
 
 }
 
-struct json** jsonMergeList(struct json** left, struct json** right)
+struct json** jsonMergeList(struct json** left, struct json** right, char* error)
 {
     size_t leftsize = 1, rightsize = 1, newsize = 0, k = 0, i = 0;
     struct json** tmp = left;
@@ -176,8 +191,8 @@ struct json** jsonMergeList(struct json** left, struct json** right)
     newlist = realloc(left, (sizeof(struct json*) * newsize));
     if(newlist == NULL)
     {
-        /* memoryFailure(); */
-        exit(EXIT_FAILURE);
+        *error = JSON_ERROR_OUTOFMEMORY;
+        return NULL;
     }
 
     left = newlist;
@@ -306,15 +321,15 @@ struct json** jsonRemoveItem(struct json** list, size_t start, size_t len)
     return newlist;
 }
 
-struct json** jsonInsertItem(struct json** list, size_t start, struct json* item)
+struct json** jsonInsertItem(struct json** list, size_t start, struct json* item, char* error)
 {
     size_t listlen = jsonListLength(list), i = 0;
     struct json** newlist = realloc(list, sizeof(struct json*) * (listlen+2));
 
     if(newlist == NULL)
     {
-        /* memoryFailure(); */
-        exit(EXIT_FAILURE);
+        *error = JSON_ERROR_OUTOFMEMORY;
+        return NULL;
     }
 
     list = newlist;
@@ -360,7 +375,7 @@ void jsonDeleteList(struct json** list)
     free(list);
 }
 
-struct json* jsonCopyTree(struct json* node)
+struct json* jsonCopyTree(struct json* node, char* error)
 {
     struct json* copy = newJSON(node->type);
 
@@ -370,7 +385,7 @@ struct json* jsonCopyTree(struct json* node)
 
         for(; i < listlen; i++)
         {
-            copy->children = jsonPushNode(copy->children, jsonCopyTree(node->children[i]));
+            copy->children = jsonPushNode(copy->children, jsonCopyTree(node->children[i], error), error);
         }
     }
 
@@ -396,35 +411,35 @@ struct json* jsonCopyTree(struct json* node)
     return copy;
 }
 
-struct json** _jsonCopyList(struct json** list, size_t length, size_t start, size_t end, char deep)
+struct json** _jsonCopyList(struct json** list, size_t length, size_t start, size_t end, char deep, char* error)
 {
     struct json** newlist = malloc(sizeof(struct json*) * (length+2));
     size_t i = 0;
     for(; start < end; start++, i++)
     {
-        newlist[i] = deep ? jsonCopyTree(list[start]) : list[start];
+        newlist[i] = deep ? jsonCopyTree(list[start], error) : list[start];
     }
 
     newlist[i] = NULL;
     return newlist;
 }
 
-struct json** jsonSSlice(struct json** list, size_t start)
+struct json** jsonSSlice(struct json** list, size_t start, char* error)
 {
-    return jsonSlice(list, start, jsonListLength(list));
+    return jsonSlice(list, start, jsonListLength(list), error);
 }
 
-struct json** jsonSlice(struct json** list, size_t start, size_t end)
+struct json** jsonSlice(struct json** list, size_t start, size_t end, char* error)
 {
     size_t length = start-end;
 
-    return _jsonCopyList(list,  length,  start,  end, 0);
+    return _jsonCopyList(list,  length,  start,  end, 0, error);
 }
 
-struct json** jsonCopyList(struct json** list)
+struct json** jsonCopyList(struct json** list, char* error)
 {
     size_t len = jsonListLength(list);
-    return _jsonCopyList(list,  len,  0,  len, 1);
+    return _jsonCopyList(list,  len,  0,  len, 1, error);
 }
 
 

@@ -30,58 +30,58 @@
 
 int main(int argc, char** argv)
 {
-    
+
     const char* js = "{\"int\" : 1, \"float\" : 1.4, \"bool\" : true, \"str\" : \"sad\", \"array\" : [1, \"asdas\", 4.5e-2, 3], \"nested\" : {\"key\" : \"value\"}}";
-    
+
     char error = 0;
     struct json* j = readJSON(js, &error);
     if ( j != NULL )
     {
         char* out = writeJSON(j);
 
-        struct json* fl = jsonGetByKey(j, "float");
-        struct json* ar = jsonGetByKey(j, "array");
+        struct json* fl = jsonGetByKey(j, "float", &error);
+        struct json* ar = jsonGetByKey(j, "array", &error);
         struct json* ne = newJSON(JSON_TYPE_INT);
         struct json* nefl = NULL;
-        
+
         printf("%s\n", out);
         free(out);
-        
+
         ne->value.i = 14;
-        
+
         if (fl != NULL)
         {
             printf("%f\n", fl->value.f);
         }
-        
+
         if (ar != NULL)
         {
-            ar->children = jsonPushNode(ar->children, ne);
+            ar->children = jsonPushNode(ar->children, ne, &error);
         }
-        
-        if (jsonRemoveByKey(j, "str"))
+
+        if (jsonRemoveByKey(j, "str", &error))
         {
             printf("removed str\n");
         }
-        
+
         nefl = newJSON(JSON_TYPE_FLOAT);
         nefl->value.f = 7.3;
-        
-        jsonAddPair(j, "newfloat", nefl);
-        
+
+        jsonAddPair(j, "newfloat", nefl, &error);
+
         out = writeJSON(j);
         printf("%s\n", out);
         free(out);
-    
+
         jsonDeleteTree(j);
-    
-        
-        
+
+
+
     }
     else
     {
         printf("Invalid JSON");
     }
-    
+
     exit(0);
 }

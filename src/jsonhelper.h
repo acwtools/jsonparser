@@ -31,21 +31,21 @@
 #include "json.h"
 #include "helper.h"
 
-struct json* jsonGetByKey( struct json* object, const char* key );
-char jsonRemoveByKey( struct json* object, const char* key );
-char jsonAddPair(struct json* object, const char* key, struct json* value);
-struct json** jsonPushNode(struct json** list, struct json* newnode);
+struct json* jsonGetByKey( struct json* object, const char* key, char* error );
+char jsonRemoveByKey( struct json* object, const char* key, char* error );
+char jsonAddPair(struct json* object, const char* key, struct json* value, char* error);
+struct json** jsonPushNode(struct json** list, struct json* newnode, char* error);
 size_t jsonListLength(struct json** list);
-struct json** jsonMergeList(struct json** left, struct json** right);
+struct json** jsonMergeList(struct json** left, struct json** right, char* error);
 size_t jsonIndexof(struct json** list, struct json* item, char* error);
 struct json** jsonRemoveItem(struct json** list, size_t start, size_t len);
-struct json** jsonInsertItem(struct json** list, size_t start, struct json* item);
+struct json** jsonInsertItem(struct json** list, size_t start, struct json* item, char* error);
 void jsonDeleteTree(struct json* node);
 void jsonDeleteList(struct json** list);
-struct json* jsonCopyTree(struct json* node);
-struct json** jsonSSlice(struct json** list, size_t start);
-struct json** jsonSlice(struct json** list, size_t start, size_t end);
-struct json** jsonCopyList(struct json** list);
+struct json* jsonCopyTree(struct json* node, char* error);
+struct json** jsonSSlice(struct json** list, size_t start, char* error);
+struct json** jsonSlice(struct json** list, size_t start, size_t end, char* error);
+struct json** jsonCopyList(struct json** list, char* error);
 
 
 #endif /* defined(__jsonparser__jsonhelper__) */

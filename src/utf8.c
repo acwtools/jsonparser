@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <strings.h>
 
-unsigned char hexDigitValue( char d )
+unsigned char hexDigitToValue( char d )
 {
     char o = 0;
     if ( d > 47 && d < 58 )
@@ -54,8 +54,8 @@ char* parseUTF8char( const char* str, size_t* len )
 
     *len = 0;
 
-    plane[0] = hexDigitValue( str[0] ) * 16 + hexDigitValue( str[1] );
-    plane[1] = hexDigitValue( str[2] ) * 16 + hexDigitValue( str[3] );
+    plane[0] = hexDigitToValue( str[0] ) * 16 + hexDigitToValue( str[1] );
+    plane[1] = hexDigitToValue( str[2] ) * 16 + hexDigitToValue( str[3] );
 
     if(plane[1] > 127 || plane[0] != 0)
     {
@@ -116,7 +116,7 @@ char* parseUTF8char( const char* str, size_t* len )
     return utf8char;
 }
 
-char digitHexValue( unsigned char d )
+char valueToHexDigit( unsigned char d )
 {
     if( d >= 0 && d < 10 )
     {
@@ -149,8 +149,8 @@ char* lowerCharToUnicode( unsigned char c, size_t* len )
     out[2] = '0';
     out[3] = '0';
 
-    out[4] = digitHexValue( higherDigit );
-    out[5] = digitHexValue( lowerDigit );
+    out[4] = valueToHexDigit( higherDigit );
+    out[5] = valueToHexDigit( lowerDigit );
 
     return out;
 }
@@ -241,13 +241,13 @@ char* highCharToUnicode( const char* str, size_t inlen, size_t* outlen )
     higherDigit = (unsigned char) plane[0] / 16;
     lowerDigit = plane[0] - (higherDigit * 16);
 
-    out[2] = digitHexValue( higherDigit );
-    out[3] = digitHexValue( lowerDigit );
+    out[2] = valueToHexDigit( higherDigit );
+    out[3] = valueToHexDigit( lowerDigit );
 
     higherDigit = (unsigned char) plane[1] / 16;
     lowerDigit = plane[1] - (higherDigit * 16);
-    out[4] = digitHexValue( higherDigit );
-    out[5] = digitHexValue( lowerDigit );
+    out[4] = valueToHexDigit( higherDigit );
+    out[5] = valueToHexDigit( lowerDigit );
 
     return out;
 }

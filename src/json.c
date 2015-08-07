@@ -38,7 +38,7 @@ struct json* newJSON(char type)
     return j;
 }
 
-char* readJSONStr(const char* string, size_t start, size_t end)
+char* readJSONStr(const char* string, size_t start, size_t end, char* error)
 {
     if(end <= start)
     {
@@ -50,15 +50,20 @@ char* readJSONStr(const char* string, size_t start, size_t end)
         size_t len = end - start;
 
         str = malloc(sizeof(char)*(len+1));
+        if ( str == NULL )
+        {
+            *error = JSON_ERROR_OUTOFMEMORY;
+            return NULL;
+        }
         memcpy(str, &string[start], len);
         str[len] = '\0';
         return str;
      }
 }
 
-char* parseJSONStr(const char* string, size_t start, size_t end)
+char* parseJSONStr(const char* string, size_t start, size_t end, char* error)
 {
-    char* str = readJSONStr(string, start, end);
+    char* str = readJSONStr(string, start, end, error);
     size_t len, startlen = len = end - start;
 
     if(str != NULL)
@@ -109,13 +114,13 @@ char* parseJSONStr(const char* string, size_t start, size_t end)
 
                     memcpy( &str[pos], utf8char, utf8len );
                     free( utf8char );
-                    
+
                     pos += utf8len;
                     lendiff = 6 - utf8len;
                     next = pos + lendiff;
-                    
+
                     memmove(&str[pos], &str[next], len - next + 1);
-                    
+
                     len -= lendiff;
                     pos++;
                     continue;
@@ -126,7 +131,7 @@ char* parseJSONStr(const char* string, size_t start, size_t end)
             pos++;
         }
     }
-    
+
     if (len < startlen)
     {
         char* tmp = realloc(str, sizeof(char)* len);
@@ -134,14 +139,18 @@ char* parseJSONStr(const char* string, size_t start, size_t end)
         {
             str = tmp;
         }
+        else
+        {
+            *error = JSON_ERROR_OUTOFMEMORY;
+        }
     }
-    
+
     return str;
 }
 
-int parseJSONint(const char* string, size_t start, size_t end)
+int parseJSONint(const char* string, size_t start, size_t end, char* error)
 {
-    char* str = readJSONStr(string, start, end);
+    char* str = readJSONStr(string, start, end, error);
     if(str != NULL)
     {
         int i = atoi(str);
@@ -151,9 +160,9 @@ int parseJSONint(const char* string, size_t start, size_t end)
     return 0;
 }
 
-double parseJSONfloat(const char* string, size_t start, size_t end)
+double parseJSONfloat(const char* string, size_t start, size_t end, char* error)
 {
-    char* str = readJSONStr(string, start, end);
+    char* str = readJSONStr(string, start, end, error);
     if(str != NULL)
     {
         double d = strtod(str, NULL);
@@ -163,19 +172,19 @@ double parseJSONfloat(const char* string, size_t start, size_t end)
     return 0;
 }
 
-struct json* readJSON( const char* string, char* error )
+struct json* readJSON( const char* string, char* error)
 {
     size_t pos = 0;
     int curly = 0, square = 0;
 
     struct json** list = _readJSON(string, &pos, 0, &curly, &square, error);
-    
+
     if (curly != 0 || square != 0 || *error != 0)
     {
         jsonDeleteList(list);
         return NULL;
     }
-    
+
     return list[0];
 }
 
@@ -195,7 +204,7 @@ struct json** _readJSON( const char* string, size_t* pos, char last, int* curly,
             (*curly)++;
             (*pos)++;
             obj->children = _readJSON(string, pos, JSON_TYPE_OBJECT, curly, square, error);
-            children = jsonPushNode(children, obj);
+            children = jsonPushNode(children, obj, error);
         }
         else if(string[*pos] == '[')
         {
@@ -203,7 +212,7 @@ struct json** _readJSON( const char* string, size_t* pos, char last, int* curly,
             (*square)++;
             (*pos)++;
             arr->children = _readJSON(string, pos, JSON_TYPE_ARRAY, curly, square, error);
-            children = jsonPushNode(children, arr);
+            children = jsonPushNode(children, arr, error);
         }
         else if(string[*pos] == '}')
         {
@@ -231,18 +240,18 @@ struct json** _readJSON( const char* string, size_t* pos, char last, int* curly,
                 (*pos)++;
                 return NULL;
             }
-            
+
             start++;
             (*pos)++;
 
-            str->value.s = parseJSONStr(string, start, *pos);
+            str->value.s = parseJSONStr(string, start, *pos, error);
             (*pos)++;
             if( last == JSON_TYPE_OBJECT )
             {
                 str->children = _readJSON(string, pos, JSON_TYPE_KEY, curly, square, error);
             }
-            children = jsonPushNode(children, str);
-            
+            children = jsonPushNode(children, str, error);
+
         }
         else if((string[*pos] > 47 && string[*pos] < 58) || string[*pos] == '.' || string[*pos] == '-')
         {
@@ -262,46 +271,41 @@ struct json** _readJSON( const char* string, size_t* pos, char last, int* curly,
             number= newJSON( isint ? JSON_TYPE_INT : JSON_TYPE_FLOAT );
             if(isint)
             {
-                number->value.i = parseJSONint(string, start, *pos);
+                number->value.i = parseJSONint(string, start, *pos, error);
             }
             else
             {
-                number->value.f = parseJSONfloat(string, start, *pos);
+                number->value.f = parseJSONfloat(string, start, *pos, error);
             }
-            children = jsonPushNode(children, number);
+            children = jsonPushNode(children, number, error);
 
         }
         else if(string[*pos] == 't')
         {
             struct json* b = newJSON( JSON_TYPE_BOOL );
             b->value.b = 1;
-            children = jsonPushNode(children, b);
+            children = jsonPushNode(children, b, error);
             (*pos)+=4;
         }
         else if(string[*pos] == 'f')
         {
             struct json* b = newJSON( JSON_TYPE_BOOL );
             b->value.b = 0;
-            children = jsonPushNode(children, b);
+            children = jsonPushNode(children, b, error);
             (*pos)+=5;
         }
-        /*
-        else if(*pos == ':')
-        {
-            (*pos)++;
-        }*/
         else if(string[*pos] == ',' && last == JSON_TYPE_KEY)
         {
             (*pos)++;
             return children;
         }
-        else if (string[*pos] == ':' || string[*pos] == ',')
+        else if ((string[*pos] == ':' && last == JSON_TYPE_KEY) || (string[*pos] == ','))
         {
             (*pos)++;
         }
         else
         {
-            *error = 1;
+            *error = JSON_ERROR_ILLEGALCHAR;
             printf("%c", string[*pos]);
             return children;
         }
@@ -313,12 +317,12 @@ char* _writeJSONStringValue( char* jsonString, const char* str,  size_t* len, ch
 {
     char* encoded = encodeUTF8str( str );
     size_t olen = strlen(encoded);
-    
+
     char* tmp = realloc(jsonString, sizeof(char) * (*len + olen + (key !=0 ? 4 : 3) ));
     if (tmp != NULL)
     {
         jsonString = tmp;
-    
+
         jsonString[*len] = '"';
         memcpy(&jsonString[*len+1], encoded, olen);
         free(encoded);
@@ -327,7 +331,7 @@ char* _writeJSONStringValue( char* jsonString, const char* str,  size_t* len, ch
         (*len)++;
          return jsonString;
     }
-    
+
     *error = 1;
     return NULL;
 }
@@ -343,9 +347,9 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
             {
                 size_t childlen = jsonListLength(node->children);
                 size_t i = 0;
-                
+
                 char* tmp = realloc(*jsonString, sizeof(char) * (*len+2));
-                
+
                 if ( tmp != NULL )
                 {
                     *jsonString = tmp;
@@ -355,6 +359,12 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                 }
                 for( ;i < childlen; i++)
                 {
+                    if(( node->type == JSON_TYPE_OBJECT && node->children[i]->type != JSON_TYPE_KEY ) || ( node->type == JSON_TYPE_ARRAY && node->children[i]->type == JSON_TYPE_KEY ))
+                    {
+                        *error = JSON_ERROR_INVALIDTYPE;
+                        break;
+                    }
+
                     _writeJSON(node->children[i], jsonString, len, error);
                     if (i < childlen-1 )
                     {
@@ -368,13 +378,13 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                         }
                         else
                         {
-                            *error = 1;
+                            *error = JSON_ERROR_OUTOFMEMORY;
                             break;
                         }
-                        
+
                     }
                 }
-                
+
                 tmp = realloc(*jsonString, sizeof(char) * (*len+2));
                 if ( tmp != NULL )
                 {
@@ -383,13 +393,23 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                     (*jsonString)[*len+1] = '\0';
                     (*len)++;
                 }
+                else
+                {
+                    *error = JSON_ERROR_OUTOFMEMORY;
+                }
                 break;
             }
             case JSON_TYPE_KEY:
             {
                 size_t childlen = jsonListLength(node->children);
                 size_t i = 0;
-                
+
+                if (childlen > 1)
+                {
+                    *error = JSON_ERROR_KEYCHILDREN;
+                    return;
+                }
+
                 *jsonString = _writeJSONStringValue(*jsonString, node->value.s,  len, 1, error);
                 if (*error)
                 {
@@ -398,12 +418,12 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                 (*jsonString)[*len] = ':';
                 (*jsonString)[*len+1] = '\0';
                 (*len)++;
-                
+
                 for( ;i < childlen; i++)
                 {
                     _writeJSON(node->children[i], jsonString, len, error);
                 }
-                
+
                 break;
             }
             case JSON_TYPE_STRING:
@@ -419,7 +439,7 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
             case JSON_TYPE_FLOAT:
             {
                 char* fStr = malloc(sizeof(char)*256);
-                
+
                 if(fStr != NULL)
                 {
                     memset(fStr, 0, 256);
@@ -430,21 +450,21 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                     if ( tmp != NULL )
                     {
                         *jsonString = tmp;
-                        
+
                         memcpy(&(*jsonString)[*len], fStr, flen);
                         *len += flen;
                         (*jsonString)[*len] = '\0';
                     }
                     else
                     {
-                        *error = 1;
+                        *error = JSON_ERROR_OUTOFMEMORY;
                     }
                     free(fStr);
-                    
+
                 }
                 else
                 {
-                    *error = 1;
+                    *error = JSON_ERROR_OUTOFMEMORY;
                 }
                 break;
             }
@@ -457,7 +477,7 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                     size_t ilen = 0;
                     sprintf(intStr, "%i", node->value.i);
                     ilen = strlen(intStr);
-                    
+
                     char* tmp = realloc(*jsonString, sizeof(char) * (*len+ilen+1));
                     if ( tmp != NULL )
                     {
@@ -468,14 +488,14 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                     }
                     else
                     {
-                        *error = 1;
+                        *error = JSON_ERROR_OUTOFMEMORY;
                     }
                     free(intStr);
-                    
+
                 }
                 else
                 {
-                    *error = 1;
+                    *error = JSON_ERROR_OUTOFMEMORY;
                 }
                 break;
             }
@@ -492,7 +512,7 @@ void _writeJSON(struct json* node, char** jsonString, size_t* len, char* error)
                 }
                 else
                 {
-                    *error = 1;
+                    *error = JSON_ERROR_OUTOFMEMORY;
                 }
                 break;
             }
@@ -507,18 +527,18 @@ char* writeJSON(struct json* node)
     char* jsonString = NULL;
     size_t len = 0;
     char error = 0;
-    
+
     if (node == NULL)
     {
         return NULL;
     }
-    
+
     _writeJSON(node, &jsonString, &len, &error);
-    
+
     if(error)
     {
         return NULL;
     }
-    
+
     return jsonString;
 }
